@@ -32,9 +32,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-//XXX
-#include <stdio.h>
-
 #include "rbuf.h"
 
 #define page_size sysconf(_SC_PAGESIZE)
@@ -151,21 +148,3 @@ int rbuf_read(rbuf *buffer, void *out, size_t length) {
 
     return 0;
 }
-
-int main(void)
-{
-    rbuf r;
-
-    printf("size: %lu\n", rbuf_init(&r, 4, STRING));
-    printf("writen: %lu\n", rbuf_write(&r, "test", strlen("test")));
-    printf("writen: %lu\n", rbuf_write(&r, "hest", strlen("hest")));
-
-    char out[10];
-    size_t ret = rbuf_read(&r, out, 10);
-    printf("read: %s, %lu\n", out, ret);
-    ret = rbuf_read(&r, out, 10);
-    printf("read: %s, %lu\n", out, ret);
-
-    rbuf_destroy(&r);
-}
-
