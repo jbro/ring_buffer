@@ -38,6 +38,7 @@
 
 size_t rbuf_init(rbuf *buffer, size_t size, enum buf_type type) 
 {
+    // Round up to multiple of page size.
     size += page_size - (size % page_size);
 
     buffer->size = size;
@@ -46,37 +47,50 @@ size_t rbuf_init(rbuf *buffer, size_t size, enum buf_type type)
     buffer->read_count = 0;
     buffer->write_count = 0;
 
+    // Default character for STREAMs
     buffer->term = '\n';
 
+    // Set file path depending on whether shared memory is compiled in or not. 
 #ifdef SHM
     char path[] = "/dev/shm/rb-XXXXXX";
 #else
     char path[] = "/tmp/rb-XXXXXX";
 #endif /* SHM */
 
+    // Create a temporary file for mmap backing.
     if((buffer->fd = mkstemp(path)) < 0)
         goto error;
 
+    // Remove file from filesystem. Note the file is still open by the 
+    // proccess.
+    // XXX there might be a security problem with this, if so, use umaks 0600.
     if(unlink(path))
         goto error;
 
+    // Resize file to buffer size.
     if(ftruncate(buffer->fd, buffer->size) < 0)
         goto error;
 
+    // Map twice the buffer size.
     if((buffer->p = mmap(NULL, 2 * buffer->size, PROT_NONE, 
             MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)) == MAP_FAILED)
         goto error;
 
+    // Map the temporary file into the first half of the above mapped space.
     if(mmap(buffer->p, buffer->size, PROT_READ | PROT_WRITE, 
                 MAP_FIXED | MAP_SHARED, buffer->fd, 0) == MAP_FAILED)
         goto error;
 
+    // Map the temporary file into the second half of the mapped space.
+    // This creates two consecutive copies of the same physical memory, thus
+    // allowing contiues reads and writes of the buffer.
     if(mmap(buffer->p + buffer->size, buffer->size, PROT_READ | PROT_WRITE, 
                 MAP_FIXED | MAP_SHARED, buffer->fd, 0) == MAP_FAILED)
         goto error;
 
     return size;
 
+    // Error handling
 error:
     // Truncate file to zero, to avoid writing back memory to file, on munmap.
     ftruncate(buffer->fd, 0);
@@ -91,8 +105,11 @@ int rbuf_destroy(rbuf *buffer)
 {
     int ret;
 
+    // Truncate file to zero, to avoid writing back memory to file, on munmap.
     ftruncate(buffer->fd, 0);
+    // Unmap the mapped virtual memmory.
     ret = munmap(buffer->p, buffer->size * 2);
+    // Close the backing file.
     close(buffer->fd);
 
     return ret;
@@ -100,14 +117,19 @@ int rbuf_destroy(rbuf *buffer)
 
 size_t rbuf_write(rbuf *buffer, void *in, size_t length)
 {
+    // Make room for the trailing '\0' in string buffers
     if(buffer->type == STRING)
         length += 1;
 
+    // Make sure we don't put in more than there's room for, by writing no
+    // more than there is free.
     if(length > rbuf_free(buffer))
         length = rbuf_free(buffer);
 
+    // Copy in.
     memcpy(rbuf_writePtr(buffer), in, length);
 
+    // Update write count
     buffer->write_count += length;
 
     return length;
@@ -116,31 +138,40 @@ size_t rbuf_write(rbuf *buffer, void *in, size_t length)
 int rbuf_read(rbuf *buffer, void *out, size_t length) {
     void *ret;
 
+    // Make sure we do not read out more than there is actually in the buffer.
     if(length > rbuf_count(buffer)) {
         length = rbuf_count(buffer);
     }
 
     switch(buffer->type) {
         case BYTE:
+            // Copy out for BYTE, nothing magic here.
             memcpy(out, rbuf_readPtr(buffer), length);
             break;
         case STRING:
+
+            // Copy out until first '\0' byte, or length.
             ret = memccpy(out, rbuf_readPtr(buffer), '\0', length);
 
             if(ret == NULL) {
+                // Make sure the data is '\0' terminated.
                 ((char *) out)[length - 1] = '\0';
             }
             else {
+                // Calculate actual read count.
                 length = ret - out;
             }
             break;
         case STREAM:
+            // Copy out until first buffer->term byte, or length.
             ret = memccpy(out, rbuf_readPtr(buffer), buffer->term, length);
 
             if(ret == NULL) {
+                // If buffer->term was not found, return error.
                 return -1;
             }
             else {
+                // Substitute buffer->term with '\0' to create a string.
                 length = ret - out;
                 ((char *) out)[length - 1] = '\0';
             }
@@ -149,7 +180,9 @@ int rbuf_read(rbuf *buffer, void *out, size_t length) {
             return -1;
     }
 
+    // Update read count.
     buffer->read_count += length;
 
     return 0;
 }
+
