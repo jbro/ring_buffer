@@ -78,6 +78,11 @@ size_t rbuf_init(rbuf *buffer, size_t size, enum buf_type type)
     return size;
 
 error:
+    // Truncate file to zero, to avoid writing back memory to file, on munmap.
+    ftruncate(buffer->fd, 0);
+    // Unmap the mapped virtual memmory.
+    munmap(buffer->p, buffer->size * 2);
+    // Close the backing file.
     close(buffer->fd);
     return -1;
 }
