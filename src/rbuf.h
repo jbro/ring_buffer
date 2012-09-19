@@ -76,10 +76,10 @@ int rbuf_destroy(rbuf *buffer);
 // Returns number of bytes currently held by the buffer.
 // NOTES:
 //    this count includes '\0', if the buffer types is STRING.
-#define rbuf_count(b)    (b->write_count - b->read_count)
+#define rbuf_count(b)    ((b)->write_count - (b)->read_count)
 
 // Returns how many bytes are availiable in the buffer.
-#define rbuf_free(b)     (b->size - rbuf_count(b))
+#define rbuf_free(b)     ((b)->size - rbuf_count(b))
 
 // Checks if the buffer is empty.
 #define rbuf_isEmpty(b)  (rbuf_count(b) == 0)
@@ -90,13 +90,13 @@ int rbuf_destroy(rbuf *buffer);
 // Returns the current write pointer.
 // NOTE:
 //    Use with care, and remeber to update write count if data is inserted.
-#define rbuf_writePtr(b) (b->p + (b->write_count % b->size))
+#define rbuf_writePtr(b) ((b)->p + ((b)->write_count % (b)->size))
 
 // Returns the current read pointer.
 // NOTE:
 //    Use with care, and remember to update the read count if data is 
 //    copied out.
-#define rbuf_readPtr(b)  (b->p + (b->read_count % b->size))
+#define rbuf_readPtr(b)  ((b)->p + ((b)->read_count % (b)->size))
 
 // Write data to buffer.
 // PARAM:
