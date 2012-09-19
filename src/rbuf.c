@@ -39,7 +39,7 @@
 size_t rbuf_init(rbuf *buffer, size_t size, enum buf_type type) 
 {
     // Round up to multiple of page size.
-    size += page_size - (size % page_size);
+    size += page_size - ((size % page_size) ? (size % page_size) : page_size);
 
     buffer->size = size;
     buffer->type = type;
