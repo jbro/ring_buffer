@@ -1,0 +1,4 @@
+Simple ring buffer, which can handle bytes, strings and streams, using mmap as 
+backend.
+
+See src/rbuf.h for interface, and Makefile for installation.
