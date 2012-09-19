@@ -26,6 +26,13 @@ $(DYNAMIC): $(OBJECT)
 $(OBJECT): $(SRCDIR)/rbuf.c $(SRCDIR)/rbuf.h
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+test: $(SRCDIR)/test.c $(DYNAMIC) $(STATIC)
+	$(CC) $(CFLAGS) -g -o $@_static $< $(STATIC)
+	./$@_static
+	$(CC) $(CFLAGS) -g -o $@_dynamic $< -I$(SRCDIR)/ -rpath ./ -L./ -lrbuf
+	./$@_dynamic
+
 clean:
 	rm -f *.{a,so}
+	rm -f test_*
 	rm -f $(SRCDIR)/*.o
