@@ -183,6 +183,6 @@ int rbuf_read(rbuf *buffer, void *out, size_t length) {
     // Update read count.
     buffer->read_count += length;
 
-    return 0;
+    return length;
 }
 
