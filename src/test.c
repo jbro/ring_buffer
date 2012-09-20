@@ -9,14 +9,11 @@ int main(void)
 {
     rbuf b;
 
-    // test init and destroy.
+    // test rounding.
     {
         assert(rbuf_init(&b, 0, BYTE) == -1);
         rbuf_destroy(&b);
-    }
 
-    // test rounding.
-    {
         assert(rbuf_init(&b, page_size/2, BYTE) == page_size);
         rbuf_destroy(&b);
 
