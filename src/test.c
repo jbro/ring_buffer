@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <string.h>
 
 #include "rbuf.h"
 
@@ -8,11 +9,14 @@ int main(void)
 {
     rbuf b;
 
-    // test rounding.
+    // test init and destroy.
     {
         assert(rbuf_init(&b, 0, BYTE) == -1);
         rbuf_destroy(&b);
+    }
 
+    // test rounding.
+    {
         assert(rbuf_init(&b, page_size/2, BYTE) == page_size);
         rbuf_destroy(&b);
 
@@ -33,7 +37,7 @@ int main(void)
         rbuf_destroy(&b);
     }
 
-    // Test reading and writing.
+    // Test BYTE
     {
         rbuf_init(&b, page_size, BYTE);
 
@@ -62,14 +66,73 @@ int main(void)
         rbuf_destroy(&b);
     }
 
-    // Test STRING
+    // Test STRING.
     {
+        rbuf_init(&b, page_size, STRING);
 
+        static char data[] = "test string";
+
+        // fill buffer.
+        while(rbuf_write(&b, data, strlen(data))); 
+        assert(rbuf_free(&b) == 0);
+
+        // overfill buffer.
+        assert(rbuf_write(&b, data, strlen(data)) == 0);
+        assert(rbuf_free(&b) == 0);
+
+        // empty buffer
+        char out[strlen(data) + 1];
+        size_t read, old_read;
+        while((read = rbuf_read(&b, out, strlen(data) + 1))) {
+            old_read = read;
+            assert(strcmp(out, data) <= 0);
+        }
+
+        assert(rbuf_count(&b) == 0);
+        assert(out[old_read - 1] == '\0');
+        assert((strlen(out) + 1) == old_read);
+        assert((page_size % (strlen(data) + 1) == old_read));
+
+        // read from empty buffer.
+        assert(rbuf_read(&b, out, strlen(data) + 1) == 0);
+
+        rbuf_destroy(&b);
     }
 
     // Test STREAM
     {
+        rbuf_init(&b, page_size, STREAM);
 
+        static char data[] = "test stream\n";
+
+        // fill buffer.
+        while(rbuf_write(&b, data, strlen(data)));
+        assert(rbuf_free(&b) == 0);
+
+        // overfill buffer.
+        assert(rbuf_write(&b, data, strlen(data)) == 0);
+        assert(rbuf_free(&b) == 0);
+
+        // empty buffer
+        char out[strlen(data)];
+
+        while(rbuf_read(&b, out, strlen(data)) != -1) {
+            assert(strncmp(out, data, strlen(out)) == 0);
+        }
+        assert(rbuf_count(&b) == page_size % strlen(data));
+
+        // read from empty buffer.
+        assert(rbuf_read(&b, out, strlen(data)) == -1);
+
+        // Terminate end stream in buffer.
+        assert(rbuf_count(&b) > 0);
+        assert(rbuf_write(&b, data + rbuf_count(&b), 
+                    strlen(data) - (page_size % strlen(data))));
+
+        assert(rbuf_read(&b, out, strlen(data)) != -1);
+        assert(strncmp(out, data, strlen(out)) == 0);
+
+        rbuf_destroy(&b);
     }
 
     // All tests passed succesfully!
